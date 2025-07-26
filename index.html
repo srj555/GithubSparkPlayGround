@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Family Tree</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #e9ecef;
+            color: #333;
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+        #controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 12px 24px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.2s;
+        }
+        button:hover {
+            background-color: #218838;
+            transform: scale(1.05);
+        }
+        button.zoom-btn {
+            background-color: #6c757d;
+        }
+        button.zoom-btn:hover {
+            background-color: #5a6268;
+        }
+        #tree-container {
+            position: relative;
+            overflow: auto;
+            max-width: 100%;
+            max-height: 600px;
+            border: 1px solid #ced4da;
+            background-color: white;
+            margin: 0 auto;
+            border-radius: 8px;
+        }
+        #tree-canvas {
+            display: block;
+            cursor: grab;
+        }
+        #family-list {
+            max-width: 800px;
+            margin: 20px auto;
+        }
+        .member {
+            padding: 15px;
+            background-color: #fff;
+            border: 1px solid #dee2e6;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: box-shadow 0.3s;
+        }
+        .member:hover {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        .member button {
+            padding: 8px 16px;
+            font-size: 14px;
+        }
+        .member .delete-btn {
+            background-color: #dc3545;
+        }
+        .member .delete-btn:hover {
+            background-color: #c82333;
+        }
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            width: 450px;
+            max-width: 90%;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            animation: fadeIn 0.3s;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .modal-content h2 {
+            margin: 0 0 20px;
+            color: #2c3e50;
+        }
+        .modal-content label {
+            display: block;
+            margin: 10px 0 5px;
+            font-weight: bold;
+        }
+        .modal-content input, .modal-content select, .modal-content textarea {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            font-size: 16px;
+        }
+        .modal-content textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+        .modal-content button {
+            margin-right: 10px;
+        }
+        .error {
+            color: #dc3545;
+            font-size: 14px;
+            margin-bottom: 10px;
+            display: none;
+        }
+        @media (max-width: 600px) {
+            #controls {
+                flex-direction: column;
+                align-items: center;
+            }
+            button {
+                width: 100%;
+                max-width: 250px;
+                margin: 5px 0;
+            }
+            .modal-content {
+                width: 95%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>Family Tree</h1>
+    <div id="controls">
+        <button onclick="openAddModal()">Add Family Member</button>
+        <button onclick="clearTree()">Clear Tree</button>
+        <button class="zoom-btn" onclick="zoomCanvas(1.2)">Zoom In</button>
+        <button class="zoom-btn" onclick="zoomCanvas(0.8)">Zoom Out</button>
+    </div>
+    <div id="tree-container">
+        <canvas id="tree-canvas" width="1000" height="600"></canvas>
+    </div>
+    <div id="family-list"></div>
+
+    <!-- Modal for Adding/Editing Family Member -->
+    <div id="add-modal" class="modal">
+        <div class="modal-content">
+            <h2 id="modal-title">Add Family Member</h2>
+            <div id="error-message" class="error"></div>
+            <form id="member-form">
+                <label for="name">Name:</label>
+                <input type="text" id="name" required>
+                <label for="gender">Gender:</label>
+                <select id="gender" required>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                </select>
+                <label for="birthYear">Birth Year (optional):</label>
+                <input type="number" id="birthYear" min="1900" max="2025">
+                <label for="notes">Notes (optional):</label>
+                <textarea id="notes"></textarea>
+                <label for="parent">Parent (optional):</label>
+                <select id="parent">
+                    <option value="">None</option>
+                </select>
+                <label for="spouse">Spouse (optional):</label>
+                <select id="spouse">
+                    <option value="">None</option>
+                </select>
+                <button type="submit">Save</button>
+                <button type="button" onclick="closeModal()">Cancel</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('tree-canvas');
+        const ctx = canvas.getContext('2d');
+        const treeContainer = document.getElementById('tree-container');
+        const familyList = document.getElementById('family-list');
+        const addModal = document.getElementById('add-modal');
+        const memberForm = document.getElementById('member-form');
+        const parentSelect = document.getElementById('parent');
+        const spouseSelect = document.getElementById('spouse');
+        const modalTitle = document.getElementById('modal-title');
+        const errorMessage = document.getElementById('error-message');
+
+        let familyMembers = JSON.parse(localStorage.getItem('familyTree')) || [];
+        let editingMemberId = null;
+        let zoomLevel = 1;
+        let panX = 0;
+        let panY = 0;
+        let isDragging = false;
+        let lastMouseX = 0;
+        let lastMouseY = 0;
+
+        // Family Member Class
+        class FamilyMember {
+            constructor(id, name, gender, birthYear, notes, parentId = null, spouseId = null) {
+                this.id = id;
+                this.name = name;
+                this.gender = gender;
+                this.birthYear = birthYear || null;
+                this.notes = notes || '';
+                this.parentId = parentId;
+                this.spouseId = spouseId;
+                this.children = [];
+            }
+        }
+
+        // Save to localStorage
+        function saveToLocalStorage() {
+            localStorage.setItem('familyTree', JSON.stringify(familyMembers));
+        }
+
+        // Validate relationships
+        function isValidRelationship(memberId, parentId, spouseId) {
+            if (!parentId && !spouseId) return true;
+            if (memberId) {
+                if (parentId && parseInt(parentId) === memberId) return "Cannot set self as parent.";
+                if (spouseId && parseInt(spouseId) === memberId) return "Cannot set self as spouse.";
+                // Check for circular parentage
+                if (parentId) {
+                    let currentId = parseInt(parentId);
+                    while (currentId) {
+                        if (currentId === memberId) return "Circular parentage detected.";
+                        const member = familyMembers.find(m => m.id === currentId);
+                        currentId = member ? parseInt(member.parentId) : null;
+                    }
+                }
+            }
+            if (spouseId) {
+                const spouse = familyMembers.find(m => m.id === parseInt(spouseId));
+                if (spouse && spouse.spouseId && spouse.spouseId !== memberId) {
+                    return "Selected spouse already has a different spouse.";
+                }
+            }
+            return true;
+        }
+
+        // Add family member
+        function addFamilyMember(name, gender, birthYear, notes, parentId, spouseId) {
+            const validation = isValidRelationship(null, parentId, spouseId);
+            if (validation !== true) {
+                showError(validation);
+                return false;
+            }
+            const id = familyMembers.length ? Math.max(...familyMembers.map(m => m.id)) + 1 : 1;
+            const member = new FamilyMember(id, name, gender, birthYear, notes, parentId, spouseId);
+            familyMembers.push(member);
+            if (parentId) {
+                const parent = familyMembers.find(m => m.id === parseInt(parentId));
+                if (parent) parent.children.push(id);
+            }
+            if (spouseId) {
+                const spouse = familyMembers.find(m => m.id === parseInt(spouseId));
+                if (spouse) spouse.spouseId = id;
+            }
+            saveToLocalStorage();
+            updateFamilyList();
+            updateSelectOptions();
+            drawTree();
+            return true;
+        }
+
+        // Update family member
+        function updateFamilyMember(id, name, gender, birthYear, notes, parentId, spouseId) {
+            const validation = isValidRelationship(id, parentId, spouseId);
+            if (validation !== true) {
+                showError(validation);
+                return false;
+            }
+            const member = familyMembers.find(m => m.id === id);
+            if (member) {
+                // Update parent
+                if (member.parentId) {
+                    const oldParent = familyMembers.find(m => m.id === parseInt(member.parentId));
+                    if (oldParent) oldParent.children = oldParent.children.filter(childId => childId !== id);
+                }
+                member.name = name;
+                member.gender = gender;
+                member.birthYear = birthYear;
+                member.notes = notes;
+                member.parentId = parentId;
+                if (parentId) {
+                    const newParent = familyMembers.find(m => m.id === parseInt(parentId));
+                    if (newParent) newParent.children.push(id);
+                }
+
+                // Update spouse
+                if (member.spouseId) {
+                    const oldSpouse = familyMembers.find(m => m.id === parseInt(member.spouseId));
+                    if (oldSpouse) oldSpouse.spouseId = null;
+                }
+                member.spouseId = spouseId;
+                if (spouseId) {
+                    const newSpouse = familyMembers.find(m => m.id === parseInt(spouseId));
+                    if (newSpouse) newSpouse.spouseId = id;
+                }
+
+                saveToLocalStorage();
+                updateFamilyList();
+                updateSelectOptions();
+                drawTree();
+                return true;
+            }
+            return false;
+        }
+
+           	    
+
+
+        // Delete family member
+        function deleteFamilyMember(id) {
+            const member = familyMembers.find(m => m.id === id);
+            if (member) {
+                // Remove from parent's children
+                if (member.parentId) {
+                    const parent = familyMembers.find(m => m.id === parseInt(member.parentId));
+                    if (parent) parent.children = parent.children.filter(childId => childId !== id);
+                }
+                // Remove spouse link
+                if (member.spouseId) {
+                    const spouse = familyMembers.find(m => m.id === parseInt(member.spouseId));
+                    if (spouse) spouse.spouseId = null;
+                }
+                // Reassign children to null parent
+                member.children.forEach(childId => {
+                    const child = familyMembers.find(m => m.id === childId);
+                    if (child) child.parentId = null;
+                });
+                familyMembers = familyMembers.filter(m => m.id !== id);
+                saveToLocalStorage();
+                updateFamilyList();
+                updateSelectOptions();
+                drawTree();
+            }
+        }
+
+        // Update select options
+        function updateSelectOptions() {
+            parentSelect.innerHTML = '<option value="">None</option>';
+            spouseSelect.innerHTML = '<option value="">None</option>';
+            familyMembers.forEach(member => {
+                const option1 = document.createElement('option');
+                option1.value = member.id;
+                option1.textContent = `${member.name} ${member.birthYear ? '(' + member.birthYear + ')' : ''}`;
+                parentSelect.appendChild(option1);
+                const option2 = document.createElement('option');
+                option2.value = member.id;
+                option2.textContent = `${member.name} ${member.birthYear ? '(' + member.birthYear + ')' : ''}`;
+                spouseSelect.appendChild(option2);
+            });
+        }
+
+        // Show error message
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+        }
+
+        // Open modal for adding member
+        function openAddModal() {
+            modalTitle.textContent = 'Add Family Member';
+            memberForm.reset();
+            errorMessage.style.display = 'none';
+            editingMemberId = null;
+            addModal.style.display = 'flex';
+        }
+
+        // Open modal for editing member
+        function editMember(id) {
+            const member = familyMembers.find(m => m.id === id);
+            if (member) {
+                modalTitle.textContent = 'Edit Family Member';
+                document.getElementById('name').value = member.name;
+                document.getElementById('gender').value = member.gender;
+                document.getElementById('birthYear').value = member.birthYear || '';
+                document.getElementById('notes').value = member.notes;
+                document.getElementById('parent').value = member.parentId || '';
+                document.getElementById('spouse').value = member.spouseId || '';
+                errorMessage.style.display = 'none';
+                editingMemberId = id;
+                addModal.style.display = 'flex';
+            }
+        }
+
+        // Close modal
+        function closeModal() {
+            addModal.style.display = 'none';
+            memberForm.reset();
+            editingMemberId = null;
+            errorMessage.style.display = 'none';
+        }
+
+        // Handle form submission
+        memberForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const name = document.getElementById('name').value.trim();
+            const gender = document.getElementById('gender').value;
+            const birthYear = document.getElementById('birthYear').value || null;
+            const notes = document.getElementById('notes').value.trim();
+            const parentId = document.getElementById('parent').value || null;
+            const spouseId = document.getElementById('spouse').value || null;
+
+            let success;
+            if (editingMemberId) {
+                success = updateFamilyMember(editingMemberId, name, gender, birthYear, notes, parentId, spouseId);
+            } else {
+                success = addFamilyMember(name, gender, birthYear, notes, parentId, spouseId);
+            }
+            if (success) closeModal();
+        });
+
+        // Clear tree
+        function clearTree() {
+            familyMembers = [];
+            saveToLocalStorage();
+            updateFamilyList();
+            updateSelectOptions();
+            drawTree();
+        }
+
+        // Zoom canvas
+        function zoomCanvas(factor) {
+            zoomLevel *= factor;
+            zoomLevel = Math.max(0.5, Math.min(zoomLevel, 2)); // Limit zoom
+            drawTree();
+        }
+
+        // Canvas drag-and-drop
+        let selectedNode = null;
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left - panX) / zoomLevel;
+            const y = (e.clientY - rect.top - panY) / zoomLevel;
+            selectedNode = getNodeAtPosition(x, y);
+            if (!selectedNode) {
+                isDragging = true;
+                lastMouseX = e.clientX;
+                lastMouseY = e.clientY;
+                canvas.style.cursor = 'grabbing';
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                const dx = e.clientX - lastMouseX;
+                const dy = e.clientY - lastMouseY;
+                panX += dx;
+                panY += dy;
+                lastMouseX = e.clientX;
+                lastMouseY = e.clientY;
+                drawTree();
+            } else if (selectedNode) {
+                const rect = canvas.getBoundingClientRect();
+                selectedNode.x = (e.clientX - rect.left - panX) / zoomLevel;
+                selectedNode.y = (e.clientY - rect.top - panY) / zoomLevel;
+                drawTree();
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            isDragging = false;
+            selectedNode = null;
+            canvas.style.cursor = 'grab';
+            saveToLocalStorage();
+        });
+
+        // Get node at position
+        function getNodeAtPosition(x, y) {
+            const nodeWidth = 120;
+            const nodeHeight = 50;
+            return positions[familyMembers.find(m => {
+                const pos = positions[m.id];
+                if (!pos) return false;
+                return x >= pos.x - nodeWidth / 2 && x <= pos.x + nodeWidth / 2 &&
+                       y >= pos.y - nodeHeight / 2 && y <= pos.y + nodeHeight / 2;
+            })?.id];
+        }
+
+        // Draw family tree
+        let positions = {};
+        function drawTree() {
+            ctx.save();
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.translate(panX, panY);
+            ctx.scale(zoomLevel, zoomLevel);
+
+            const nodeWidth = 120;
+            const nodeHeight = 50;
+            const levelHeight = 120;
+            const siblingGap = 30;
+
+            // Calculate positions if not dragging
+            if (!selectedNode) {
+                positions = {};
+                function calculatePositions(memberId, level, x, usedX) {
+                    const member = familyMembers.find(m => m.id === memberId);
+                    if (!member) return x;
+
+                    let childrenWidth = 0;
+                    member.children.forEach(childId => {
+                        childrenWidth += calculatePositions(childId, level + 1, x + childrenWidth, usedX);
+                    });
+                    childrenWidth = Math.max(childrenWidth, nodeWidth);
+
+                    const posX = x + childrenWidth / 2;
+                    positions[memberId] = positions[memberId] || { x: posX, y: level * levelHeight };
+                    usedX.push([posX - nodeWidth / 2, posX + nodeWidth / 2]);
+
+                    return childrenWidth + siblingGap;
+                }
+
+                let startX = 50;
+                familyMembers.filter(m => !m.parentId).forEach(member => {
+                    startX += calculatePositions(member.id, 1, startX, []);
+                });
+            }
+
+            // Draw nodes and connections
+            familyMembers.forEach(member => {
+                const pos = positions[member.id];
+                if (!pos) return;
+
+                // Draw node
+                ctx.fillStyle = member.gender === 'Male' ? '#4dabf7' : member.gender === 'Female' ? '#ff8787' : '#adb5bd';
+                ctx.fillRect(pos.x - nodeWidth / 2, pos.y - nodeHeight / 2, nodeWidth, nodeHeight);
+                ctx.strokeStyle = '#2c3e50';
+                ctx.strokeRect(pos.x - nodeWidth / 2, pos.y - nodeHeight / 2, nodeWidth, nodeHeight);
+                ctx.fillStyle = '#2c3e50';
+                ctx.textAlign = 'center';
+                ctx.font = '14px Segoe UI';
+                ctx.fillText(member.name, pos.x, pos.y - 5);
+                if (member.birthYear) {
+                    ctx.fillText(member.birthYear, pos.x, pos.y + 15);
+                }
+
+                // Draw connection to parent
+                if (member.parentId) {
+                    const parentPos = positions[member.parentId];
+                    if (parentPos) {
+                        ctx.beginPath();
+                        ctx.moveTo(pos.x, pos.y - nodeHeight / 2);
+                        ctx.lineTo(parentPos.x, parentPos.y + nodeHeight / 2);
+                        ctx.stroke();
+                    }
+                }
+
+                // Draw connection to spouse
+                if (member.spouseId) {
+                    const spousePos = positions[member.spouseId];
+                    if (spousePos) {
+                        ctx.beginPath();
+                        ctx.moveTo(pos.x + nodeWidth / 2, pos.y);
+                        ctx.lineTo(spousePos.x - nodeWidth / 2, spousePos.y);
+                        ctx.strokeStyle = '#e03131';
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                        ctx.strokeStyle = '#2c3e50';
+                        ctx.lineWidth = 1;
+                    }
+                }
+            });
+
+            ctx.restore();
+        }
+
+        // Initialize
+        updateSelectOptions();
+        updateFamilyList();
+        drawTree();
+    </script>
+</body>
+</html>
